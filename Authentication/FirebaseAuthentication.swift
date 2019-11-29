@@ -29,6 +29,27 @@ class FirebaseAuthentication: NSObject {
     
     private override init() {}
     
+    func signUpWithEmail(email: String, password: String) {
+        Auth.auth().createUser(withEmail: email, password: password) { [weak self] (authResult, error) in
+            if error != nil {
+                self?.postNotificationSignInError()
+                return
+            }
+            self?.postNotificationSignInSuccess()
+        }
+    }
+
+    func signInWithEmail(email: String, password: String) {
+        Auth.auth().signIn(withEmail: email, password: password) { [weak self] (user, error) in
+            if error != nil {
+                self?.postNotificationSignInError()
+                return
+            }
+            self?.postNotificationSignInSuccess()
+        }
+    }
+    
+    @available(iOS 13.0, *)
     func signInWithApple() {
         let nonce = randomNonceString()
         currentNonce = nonce
@@ -64,6 +85,7 @@ class FirebaseAuthentication: NSObject {
     }
 }
 
+@available(iOS 13.0, *)
 extension FirebaseAuthentication: ASAuthorizationControllerDelegate {
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
@@ -100,6 +122,7 @@ extension FirebaseAuthentication: ASAuthorizationControllerDelegate {
 }
 
 extension FirebaseAuthentication: ASAuthorizationControllerPresentationContextProviding {
+    @available(iOS 13.0, *)
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         return UIApplication.shared.windows.first!
     }

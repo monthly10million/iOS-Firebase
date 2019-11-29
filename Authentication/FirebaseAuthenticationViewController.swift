@@ -10,7 +10,11 @@ import UIKit
 
 class FirebaseAuthenticationViewController: UIViewController {
     @IBAction func didTappedSignInWithAppleID() {
-        FirebaseAuthentication.shared.signInWithApple()
+        if #available(iOS 13.0, *) {
+            FirebaseAuthentication.shared.signInWithApple()
+        } else {
+            // Fallback on earlier versions
+        }
     }
 
     @IBAction func didTappedSignInWithAnonymous() {
