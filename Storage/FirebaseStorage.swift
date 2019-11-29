@@ -53,7 +53,7 @@ class FirebaseStorage {
     }
 
     func delete(downloadURL: String, completion: @escaping (_ result: Result<Void, FirebaseStorageError>)->()) {
-        Storage.storage().reference(forURL: downloadURL).delete { (error) in
+        reference(forURL: downloadURL).delete { (error) in
             guard error == nil else {
                 completion(.failure(.deleteError))
                 return
@@ -71,5 +71,9 @@ class FirebaseStorage {
         }
 
         return ref
+    }
+
+    func reference(forURL: String) -> StorageReference {
+        return Storage.storage().reference(forURL: forURL)
     }
 }

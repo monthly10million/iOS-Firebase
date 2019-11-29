@@ -7,10 +7,20 @@
 //
 
 import Foundation
-import FirebaseDatabase
 
 class FirebaseObject: Decodable {
     var key: String? = nil
+}
+
+class FirebaesObjectArrayWrapper: Decodable {
+    var key: String? = nil
+    var value: [String: String]? = nil
+}
+
+// Enum -> String을 위한 Protocol
+// Enum은 EnumForFirebaseObject과 String을 상속받고 valueForDict에 rawValue를 리턴해야한다.
+protocol EnumForFirebaseObject {
+    var valueForDict: String { get }
 }
 
 extension FirebaseObject {
@@ -19,7 +29,11 @@ extension FirebaseObject {
         let otherSelf = Mirror(reflecting: self)
         for child in otherSelf.children {
             if let key = child.label {
-                dict[key] = child.value
+                if let enumValue = child.value as? EnumForFirebaseObject {
+                    dict[key] = enumValue.valueForDict
+                } else {
+                    dict[key] = child.value
+                }
             }
         }
         return dict

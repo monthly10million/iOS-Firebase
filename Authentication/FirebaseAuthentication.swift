@@ -58,7 +58,7 @@ class FirebaseAuthentication: NSObject {
         do {
             try firebaseAuth.signOut()
             postNotificationSignOutSuccess()
-        } catch let error {
+        } catch {
             postNotificationSignOutError()
         }
     }

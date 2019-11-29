@@ -61,7 +61,11 @@ class FirebaseDatabase {
 
     // Path에 Value를 추가한다.
     func addObject(path: String, object: FirebaseObject) {
-        pathToRef(path).childByAutoId().updateChildValues(object.asDict())
+        if let key = object.key {
+            pathToRef(path).child(key).updateChildValues(object.asDict())
+        } else {
+            pathToRef(path).childByAutoId().updateChildValues(object.asDict())
+        }
     }
 
     func delete(path: String, object: FirebaseObject) {
