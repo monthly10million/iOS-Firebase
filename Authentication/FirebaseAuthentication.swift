@@ -22,12 +22,20 @@ enum FirebaseAuthenticationNotification: String {
     }
 }
 
+enum FirebaseAuthenticationKey: String {
+    case userIntegration = "UserIntegrationKey"
+}
+
 class FirebaseAuthentication: NSObject {
     static let shared = FirebaseAuthentication()
 
     fileprivate var currentNonce: String?
     
     private override init() {}
+    
+    func currentUser() -> User? {
+        return Auth.auth().currentUser
+    }
     
     func signUpWithEmail(email: String, password: String) {
         Auth.auth().createUser(withEmail: email, password: password) { [weak self] (authResult, error) in
@@ -40,11 +48,12 @@ class FirebaseAuthentication: NSObject {
     }
 
     func signInWithEmail(email: String, password: String) {
-        Auth.auth().signIn(withEmail: email, password: password) { [weak self] (user, error) in
-            if error != nil {
+        Auth.auth().signIn(withEmail: email, password: password) { [weak self] (authResult, error) in
+            guard let user = authResult?.user, error == nil else {
                 self?.postNotificationSignInError()
                 return
             }
+            self?.registerUser(user: user)
             self?.postNotificationSignInSuccess()
         }
     }
@@ -66,10 +75,11 @@ class FirebaseAuthentication: NSObject {
     
     func signInWithAnonymous() {
         Auth.auth().signInAnonymously() { [weak self] (authResult, error) in
-            if error != nil {
+            guard let user = authResult?.user, error == nil else {
                 self?.postNotificationSignInError()
                 return
             }
+            self?.registerUser(user: user)
             self?.postNotificationSignInSuccess()
         }
     }
@@ -78,10 +88,43 @@ class FirebaseAuthentication: NSObject {
         let firebaseAuth = Auth.auth()
         do {
             try firebaseAuth.signOut()
+            _integrationKey = nil
+            UserDefaultsService.shared.set(key: FirebaseAuthenticationKey.userIntegration.rawValue, "")
             postNotificationSignOutSuccess()
         } catch {
             postNotificationSignOutError()
         }
+    }
+
+    // Third-party 로그인 통합을 위한 함수. API Path로 사용할 Unique Key 생성
+    private func registerUser(user: User) {
+        let integrationKey = FirebaseDatabase.shared.addAuthID(path: "private/user-integration-keys")
+        FirebaseDatabase.shared.setObject(path: "private/user-integration-keys/\(integrationKey)", object: user.uid)
+        FirebaseDatabase.shared.setObject(path: "private/users/\(user.uid)/integration-key", object: integrationKey)
+        UserDefaultsService.shared.set(key: FirebaseAuthenticationKey.userIntegration.rawValue, integrationKey)
+    }
+
+    // Third-party 로그인 통합을 위한 함수. 현재 계정에 연결된 Integration Key를 반환
+    var _integrationKey: String?
+    func integrationKey() -> String {
+        if let key = _integrationKey {
+            return key
+        }
+
+        if let key = UserDefaultsService.shared.getString(key: FirebaseAuthenticationKey.userIntegration.rawValue), key.count > 0 {
+            _integrationKey = key
+            return key
+        }
+
+        guard let UID = FirebaseAuthentication.shared.currentUser()?.uid else {
+            fatalError()
+        }
+
+        FirebaseDatabase.shared.loadObjects(path: "private/users/\(UID)/integration-key", type: String.self) { [weak self] integrationKey in
+            self?._integrationKey = integrationKey
+        }
+
+        fatalError()
     }
 }
 
@@ -106,18 +149,18 @@ extension FirebaseAuthentication: ASAuthorizationControllerDelegate {
                                                       rawNonce: nonce)
             // Sign in with Firebase.
             Auth.auth().signIn(with: credential) { [weak self] (authResult, error) in
-                if (error != nil) {
+                guard let user = authResult?.user, error == nil else {
                     self?.postNotificationSignInError()
                     return
                 }
+                self?.registerUser(user: user)
                 self?.postNotificationSignInSuccess()
             }
         }
     }
     
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        // Handle error.
-        print("Sign in with Apple errored: \(error)")
+        postNotificationSignInError()
     }
 }
 
