@@ -158,6 +158,10 @@ class FirebaseDatabase {
         pathToRef(deletePath).removeValue()
     }
 
+    func delete(path: String) {
+        pathToRef(path).removeValue()
+    }
+
     private func pathToRef(_ routesString : String) -> DatabaseReference {
         let routes = routesString.components(separatedBy: "/").filter { !$0.isEmpty }
 

@@ -70,4 +70,9 @@ extension Reactive where Base: FirebaseDatabase {
         base.delete(path: path, object: object)
         return .just(Void())
     }
+
+    func delete(path: String) -> Single<Void> {
+        base.delete(path: path)
+        return .just(Void())
+    }
 }

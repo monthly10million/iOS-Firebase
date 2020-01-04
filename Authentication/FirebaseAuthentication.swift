@@ -96,6 +96,11 @@ class FirebaseAuthentication: NSObject {
         }
     }
 
+    func deleteUser() {
+        let firebaseAuth = Auth.auth()
+        firebaseAuth.currentUser?.delete(completion: nil)
+    }
+
     // Third-party 로그인 통합을 위한 함수. API Path로 사용할 Unique Key 생성
     private func registerUser(user: User) {
         let integrationKey = FirebaseDatabase.shared.addAuthID(path: "private/user-integration-keys")
