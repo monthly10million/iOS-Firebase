@@ -10,11 +10,7 @@ import Foundation
 
 class FirebaseObject: Decodable {
     var key: String? = nil
-}
-
-class FirebaesObjectArrayWrapper: Decodable {
-    var key: String? = nil
-    var value: [String: String]? = nil
+    var exceptionKeys: [String]? = nil
 }
 
 // Enum -> String을 위한 Protocol
@@ -28,9 +24,11 @@ extension FirebaseObject {
         var dict = [String: Any]()
         let otherSelf = Mirror(reflecting: self)
         for child in otherSelf.children {
-            if let key = child.label {
+            if let key = child.label, !(exceptionKeys?.contains(key) ?? false) {
                 if let enumValue = child.value as? EnumForFirebaseObject {
                     dict[key] = enumValue.valueForDict
+                } else if let dateValue = child.value as? Date {
+                    dict[key] = Int(dateValue.timeIntervalSince1970)
                 } else {
                     dict[key] = child.value
                 }

@@ -10,9 +10,18 @@ import Foundation
 import FirebaseDatabase
 
 struct FirebaseDatabaseQuery {
-    var orderChildKey: String?
-    var startKey: Any?
-    var endKey: Any?
+    enum Order {
+        case asec
+        case desc
+    }
+
+    var orderChildKey: String? = nil
+    var startKey: Any? = nil
+    var endKey: Any? = nil
+    var orderByKey: Bool = false
+
+    var order: Order = .asec
+    var limitCount: UInt = 20
 }
 
 class FirebaseDatabase {
@@ -24,7 +33,7 @@ class FirebaseDatabase {
 
     private init() {}
 
-    func loadObjects<D: FirebaseObject>(path: String, type: D.Type, completion: @escaping (_ object: D?)->()) {
+    func loadFirebaseObject<D: FirebaseObject>(path: String, type: D.Type, completion: @escaping (_ object: D?)->()) {
         pathToRef(path).observeSingleEvent(of: .value) { [weak self] (snapshot) in
             guard snapshot.exists(),
                 let snapShotValue = snapshot.value,
@@ -41,8 +50,44 @@ class FirebaseDatabase {
         }
     }
     
-    func loadObjects<D: Decodable>(path: String, type: D.Type, completion: @escaping (_ object: D?)->()) {
-        pathToRef(path).observeSingleEvent(of: .value) { [weak self] (snapshot) in
+    func loadObject<D: Decodable>(path: String, type: D.Type, completion: @escaping (_ object: D?)->()) {
+        pathToRef(path).observeSingleEvent(of: .value) { (snapshot) in
+            guard snapshot.exists(),
+                let snapShotValue = snapshot.value else {
+                completion(nil)
+                return
+            }
+
+            guard let value = snapShotValue as? D else {
+                completion(nil)
+                return
+            }
+            completion(value)
+        }
+    }
+
+    func loadObjects<D: Decodable>(path: String, query: FirebaseDatabaseQuery? = nil, type: D.Type, completion: @escaping (_ object: D?)->()) {
+        var path = pathToRef(path).queryOrderedByKey()
+
+        if let query = query {
+            if let orderChildKey = query.orderChildKey {
+                path = path.queryOrdered(byChild: orderChildKey)
+            }
+            if let startkey = query.startKey {
+                path = path.queryStarting(atValue: startkey)
+            }
+            if let endKey = query.endKey {
+                path = path.queryEnding(atValue: endKey)
+            }
+            switch query.order {
+            case .asec:
+                path = path.queryLimited(toFirst: query.limitCount)
+            case .desc:
+                path = path.queryLimited(toLast: query.limitCount)
+            }
+        }
+
+        path.observeSingleEvent(of: .value) { [weak self] (snapshot) in
             guard snapshot.exists(),
                 let snapShotValue = snapshot.value,
                 let data = try? JSONSerialization.data(withJSONObject: snapShotValue) else {
@@ -58,22 +103,27 @@ class FirebaseDatabase {
         }
     }
 
-    func loadObjects<D: Decodable>(path: String, query: FirebaseDatabaseQuery? = nil, type: [D].Type, completion: @escaping (_ object: [D])->()) {
-        var path = pathToRef(path).queryLimited(toLast: 2_147_483_648 - 1)
-
-        if let query = query {
-            if let orderChildKey = query.orderChildKey {
-                path = path.queryOrdered(byChild: orderChildKey)
-            }
-            if let startkey = query.startKey {
-                path = path.queryStarting(atValue: startkey)
-            }
-            if let endKey = query.endKey {
-                path = path.queryEnding(atValue: endKey)
-            }
+    func loadFirebaseObjects<D: FirebaseObject>(path: String, query: FirebaseDatabaseQuery, type: [D].Type, completion: @escaping (_ object: [D])->()) {
+        var databaseQuery: DatabaseQuery
+        switch query.order {
+        case .asec:
+            databaseQuery = pathToRef(path).queryLimited(toFirst: query.limitCount)
+        case .desc:
+            databaseQuery = pathToRef(path).queryLimited(toLast: query.limitCount)
         }
 
-        path.observeSingleEvent(of: .value) { [weak self] (snapshot) in
+        if let orderChildKey = query.orderChildKey {
+            databaseQuery = databaseQuery.queryOrdered(byChild: orderChildKey)
+        }
+        if let startkey = query.startKey {
+            databaseQuery = databaseQuery.queryStarting(atValue: startkey)
+        }
+        if let endKey = query.endKey {
+            databaseQuery = databaseQuery.queryEnding(atValue: endKey)
+        }
+
+
+        databaseQuery.observeSingleEvent(of: .value) { [weak self] (snapshot) in
             self?.loadObjectsCore(snapshot: snapshot, completion: completion)
         }
     }
@@ -124,7 +174,7 @@ class FirebaseDatabase {
     }
 
     // Path에 Value를 Set 한다.
-    func setObject<D: FirebaseObject>(path: String, object: D) {
+    func setFirebaseObject<D: FirebaseObject>(path: String, object: D) {
         pathToRef(path).updateChildValues(object.asDict())
     }
 
@@ -133,7 +183,7 @@ class FirebaseDatabase {
     }
 
     // Path에 Value를 추가한다.
-    func addObject(path: String, object: FirebaseObject) -> String {
+    func addFirebaseObject(path: String, object: FirebaseObject) -> String {
         if let key = object.key {
             pathToRef(path).child(key).updateChildValues(object.asDict())
             return key
